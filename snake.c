@@ -1,372 +1,316 @@
 #include<stdio.h>
 #include<time.h>
-#include<windows.h>
-#include<stdlib.h>
+#include<string.h>
+int ROW = 20;//围墙
+int LINE = 50;
+//定义蛇头的坐标
+int head_x = 0;
+int head_y = 0;
+int snake_length = 5;//定义蛇的长度
+int head_v = 5;//定义初始数据：蛇的长度
+//定义蛇尾坐标
+int tail_x = 0;
+int tail_y = 0;
+int count = 0;//统计实物个数
+int ch,sh;//方向键键值
+//食物坐标
+int  food_x = 0;
+int  food_y = 0;
+int main(){//主函数
+    char map[ROW][LINE]; //定义地图：map
+    memset(map,0,sizeof(map));
+    /* memset---将map中当前位置后面的（）个字节用0代替并返回map
+     * sizeof---返回map对象所占的内存字节数
+     */
+    createMap(map);   //创建地图
+    //初始化蛇的信息：蛇头在地图中间
+    head_x = ROW/2;
+    head_y = LINE/2;
 
-#define U 1
-#define D 2
-#define L 3
-#define R 4 //蛇的状态，U：上 ；D：下；L:左 R：右
+    int snake[ROW][LINE];
+    memset(snake,0,sizeof(snake));
+    //将snake数组中当前位置后面的（）个字节用0代替并返回snake
 
-typedef struct SNAKE { //蛇身的一个节点
-	int x;
-	int y;
-	struct SNAKE *next;
-} snake;
+    createSnake(snake); //创建蛇
 
-//全局变量//
-int score=0,add=10;//总得分与每次吃食物得分。
-int status,sleeptime=200;//每次运行的时间间隔
-snake *head, *food;//蛇头指针，食物指针
-snake *q;//遍历蛇的时候用到的指针
-int endgamestatus=0; //游戏结束的情况，1：撞到墙；2：咬到自己；3：主动退出游戏。
+    createFood(map,snake);//创建食物
 
-//声明全部函数//
-void Pos();
-void creatMap();
-void initsnake();
-int biteself();
-void createfood();
-void cantcrosswall();
-void snakemove();
-void pause();
-void gamecircle();
-void welcometogame();
-void endgame();
-void gamestart();
+    showMapAndSnake(map,snake);//同时打印蛇与地图
+    //蛇的运动
+    run(map,snake);
 
-void Pos(int x,int y)//设置光标位置
-{
-	COORD pos;
-	HANDLE hOutput;
-	pos.X=x;
-	pos.Y=y;
-	hOutput=GetStdHandle(STD_OUTPUT_HANDLE);
-	SetConsoleCursorPosition(hOutput,pos);
+    result();
+
+    return 0;
+}
+//-创建地图
+void createMap(char map[ROW][LINE]){
+    //上下
+    for(int i=0;i<LINE;i++){
+        map[0][i] = '#';            //【0】【i】为第一行的的坐标
+        map[ROW-1][i] = '#';        //【ROW】【i】为最后行的坐标
+    }
+    //
+
+    //左右
+    for(int i=0;i<ROW;i++){
+        map[i][0] = '#';
+        map[i][LINE-1] = '#';
+    }
+
 }
 
-void creatMap()//创建地图
-{
-	int i;
-	for(i=0; i<58; i+=2) { //打印上下边框
-		Pos(i,0);
-		printf("■");
-		Pos(i,26);
-		printf("■");
-	}
-	for(i=1; i<26; i++) { //打印左右边框
-		Pos(0,i);
-		printf("■");
-		Pos(56,i);
-		printf("■");
-	}
+//创建蛇
+void createSnake(int snake[ROW][LINE]){
+    //蛇头的坐标与内容
+    int value = snake_length;
+    snake[head_x][head_y] = value;
+
+
+    //蛇身设置
+    for(int i=0;i<snake_length;i++){
+        snake[head_x][head_y+1+i] = --value;
+    }
+
+    //获得蛇尾的坐标
+    tail_x = head_x;
+    tail_y = head_y + snake_length-1;
+
+}
+//地图与蛇 同时打印
+void showMapAndSnake(char map[ROW][LINE],int snake[ROW][LINE]){
+    for(int i=0;i<ROW;i++){
+        for(int j=0;j<LINE;j++){
+            if(snake[i][j]!=0){
+                if(snake[i][j]==head_v){
+                    printf("@");
+                }else{
+                    printf("a");
+                }
+            }else{
+                printf("%c",map[i][j]);
+            }
+        }
+        printf("\n");
+    }
+}
+//创建食物
+void createFood(char map[ROW][LINE],int snake[ROW][LINE]){
+    int  food_x = 0;
+    int food_y = 0;
+    srand((unsigned)time(NULL));
+    while(map[food_x][food_y]=='#'||snake[food_x][food_y]!=0){
+        // srand
+        food_x = rand()%ROW+1;
+        food_y = rand()%LINE+1;
+
+        //srand - 初始化随机种子
+        //rand  - 产生随机数
+    }
+    map[food_x][food_y] = 'O';
+
+
 }
 
-void initsnake()//初始化蛇身
+//蛇尾
+void moveTail(int snake[ROW][LINE]){
+    if(snake[head_x][head_y]!='O'){
+        //-上
+        if(snake[tail_x][tail_y]+1 == snake[tail_x-1][tail_y]){
+            snake[tail_x][tail_y] = 0;
+            tail_x--;
+        }
+        //如果蛇尾[tail_x][tail_y]的前一个snake[tail_x][tail_y]+1的坐标=蛇尾正上方的坐标
+        //那么 给蛇尾赋值为0，即不打印这个坐标位置的蛇尾
+        //-下
+        else if(snake[tail_x][tail_y]+1==snake[tail_x+1][tail_y]){
+            snake[tail_x][tail_y] = 0;
+            tail_x++;
+        }
+        //-左
+        else if(snake[tail_x][tail_y]+1==snake[tail_x][tail_y-1]){
+            snake[tail_x][tail_y] = 0;
+            tail_y--;
+        }
+        //-右
+        else if(snake[tail_x][tail_y]+1==snake[tail_x][tail_y+1]){
+            snake[tail_x][tail_y] = 0;
+            tail_y++;
+        }
+    }
+}
+//蛇撞墙
+int isWall()
 {
-	snake *tail;
-	int i;
-	tail=(snake*)malloc(sizeof(snake));//从蛇尾开始，头插法，以x,y设定开始的位置//
-	tail->x=24;
-	tail->y=5;
-	tail->next=NULL;
-	for(i=1; i<=4; i++) {
-		head=(snake*)malloc(sizeof(snake));
-		head->next=tail;
-		head->x=24+2*i;
-		head->y=5;
-		tail=head;
-	}
-	while(tail!=NULL) { //从头到为，输出蛇身
-		Pos(tail->x,tail->y);
-		printf("■");
-		tail=tail->next;
-	}
+    if(head_x==0||head_x==ROW-1||head_y==0||head_y==LINE-1)
+    {
+        return 0;
+    }else{
+        return 1;
+    }
+}
+//吃食物
+int eatFood(char map[ROW][LINE])
+{
+    if(map[head_x][head_y]=='O')
+    {
+        map[head_x][head_y] = 0;
+        count++;
+        return 1;
+
+    }else{
+        return 0;
+    }
+}
+//结果处理
+void result(){
+    printf("Game Over!\n");
+    printf("Your Score is:%d\n",count);
+    printf("Please Enter\n");
 }
 
-int biteself()//判断是否咬到了自己
-{
-	snake *self;
-	self=head->next;
-	while(self!=NULL) {
-		if(self->x==head->x && self->y==head->y) {
-			return 1;
-		}
-		self=self->next;
-	}
-	return 0;
+
+// 蛇的移动
+void run(char map[ROW][LINE],int snake[ROW][LINE]){
+    //定义蛇的运动方向
+    char direct;
+    while(1){
+        if(isWall()){
+            //判断键盘是否被敲击
+            if(kbhit()){
+                // WASD控制方向
+                //获得键盘某个键的信息w
+                char ch = getch();
+                if(ch==-32){
+                    char sh=getch();
+                    if(sh==72){
+                        if(direct=='s'){
+                            continue;
+                        }
+                        direct = 'w';
+
+                    }else if(sh==80){
+                        if(direct=='w'){
+                            continue;
+                        }
+                        direct = 's';
+
+                    }else if(sh==75){
+                        if(direct=='d'){
+                            continue;
+                        }
+                        direct = 'a';
+
+                    }else if(sh==77){
+                        if(direct=='a'){
+                            continue;
+                        }
+                        direct = 'd';
+
+                    }
+                }else{
+                    if(ch=='A'||ch=='a'){
+                        if(direct=='d'){
+                            continue;
+                        }
+                        direct = 'a';
+                    }else if(ch=='D'||ch=='d'){
+                        if(direct=='a'){
+                            continue;
+                        }
+                        direct = 'd';
+                    }else if(ch=='W'||ch=='w'){
+                        if(direct=='s'){
+                            continue;
+                        }
+                        direct = 'w';
+                    }else if(ch=='S'||ch=='s'){
+                        if(direct=='w'){
+                            continue;
+                        }
+                        direct = 's';
+                    }else{
+                        continue;
+                    }
+                }
+
+                //通过方向direct控制蛇的移动
+                switch (direct) {
+                case 'w':{// 上
+
+
+                    // 判断移动之后，是否接触到蛇的身体
+
+                    if(snake[head_x-1][head_y]!=0){
+                        return;
+                    }
+
+                    // 确定蛇头的位置、将移动后的位置设置为蛇头的坐标
+                    snake[head_x-1][head_y] = ++head_v;
+                    head_x--;
+
+                }break;
+                case 's':{//下
+
+
+                    if(snake[head_x+1][head_y]!=0){
+                        return;
+                    }
+
+
+                    snake[head_x+1][head_y] = ++head_v;
+                    head_x++;
+                }break;
+                case 'a':{//左
+
+
+
+                    if(snake[head_x][head_y-1]!=0){
+                        return;
+                    }
+
+                    snake[head_x][head_y-1] = ++head_v;
+                    head_y--;
+
+                }break;
+                case 'd':{//右
+
+                    if(snake[head_x][head_y+1]!=0){
+                        return;
+                    }
+
+                    snake[head_x][head_y+1] = ++head_v;
+                    head_y++;
+                }break;
+                default:
+                    break;
+                }
+                // 创建完毕之后，进行蛇的绘制
+                if(direct=='a'||direct=='w'||direct=='s'||direct=='d'){
+                    //先将控制台清空
+                    system("cls");
+
+                    if(eatFood(map)){
+                        createFood(map,snake);
+                    }else{
+                        //先将蛇尾处理
+                        moveTail(snake);
+
+                    }
+
+
+                    //重新绘制
+                    showMapAndSnake(map,snake);
+                }
+            }
+
+
+        }else{
+            return;
+        }
+    }
+
+
 }
 
-void createfood()//随机出现食物
-{
-	snake *food_1;
-	srand((unsigned)time(NULL));
-	food_1=(snake*)malloc(sizeof(snake));
-	while((food_1->x%2)!=0) { //保证其为偶数，使得食物能与蛇头对其
-		food_1->x=rand()%52+2;
-	}
-	food_1->y=rand()%24+1;
-	q=head;
-	while(q->next==NULL) {
-		if(q->x==food_1->x && q->y==food_1->y) { //判断蛇身是否与食物重合
-			free(food_1);
-			createfood();
-		}
-		q=q->next;
-	}
-	Pos(food_1->x,food_1->y);
-	food=food_1;
-	printf("■");
-}
 
-void cantcrosswall()//不能穿墙
-{
-	if(head->x==0 || head->x==56 ||head->y==0 || head->y==26) {
-		endgamestatus=1;
-		endgame();
-	}
-}
-
-void snakemove()//蛇前进,上U,下D,左L,右R
-{
-	snake * nexthead;
-	cantcrosswall();
-
-	nexthead=(snake*)malloc(sizeof(snake));
-	if(status==U) {
-		nexthead->x=head->x;
-		nexthead->y=head->y-1;
-		if(nexthead->x==food->x && nexthead->y==food->y) { //如果下一个有食物//
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			score=score+add;
-			createfood();
-		} else { //如果没有食物//
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q->next->next!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			Pos(q->next->x,q->next->y);
-			printf(" ");
-			free(q->next);
-			q->next=NULL;
-		}
-	}
-	if(status==D) {
-		nexthead->x=head->x;
-		nexthead->y=head->y+1;
-		if(nexthead->x==food->x && nexthead->y==food->y) { //有食物
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			score=score+add;
-			createfood();
-		} else { //没有食物
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q->next->next!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			Pos(q->next->x,q->next->y);
-			printf(" ");
-			free(q->next);
-			q->next=NULL;
-		}
-	}
-	if(status==L) {
-		nexthead->x=head->x-2;
-		nexthead->y=head->y;
-		if(nexthead->x==food->x && nexthead->y==food->y) { //有食物
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			score=score+add;
-			createfood();
-		} else { //没有食物
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q->next->next!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			Pos(q->next->x,q->next->y);
-			printf(" ");
-			free(q->next);
-			q->next=NULL;
-		}
-	}
-	if(status==R) {
-		nexthead->x=head->x+2;
-		nexthead->y=head->y;
-		if(nexthead->x==food->x && nexthead->y==food->y) { //有食物
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			score=score+add;
-			createfood();
-		} else { //没有食物
-			nexthead->next=head;
-			head=nexthead;
-			q=head;
-			while(q->next->next!=NULL) {
-				Pos(q->x,q->y);
-				printf("■");
-				q=q->next;
-			}
-			Pos(q->next->x,q->next->y);
-			printf(" ");
-			free(q->next);
-			q->next=NULL;
-		}
-	}
-	if(biteself()==1) { //判断是否会咬到自己
-		endgamestatus=2;
-		endgame();
-	}
-}
-
-void pause()//暂停
-{
-	while(1) {
-		Sleep(300);
-		if(GetAsyncKeyState(VK_SPACE)) {
-			break;
-		}
-
-	}
-}
-
-void gamecircle()//控制游戏
-{
-
-	Pos(64,15);
-	printf("不能穿墙，不能咬到自己\n");
-	Pos(64,16);
-	printf("用↑.↓.←.→分别控制蛇的移动.");
-	Pos(64,17);
-	printf("F1 为加速，F2 为减速\n");
-	Pos(64,18);
-	printf("ESC ：退出游戏.space：暂停游戏.");
-	Pos(64,20);
-	printf("c语言研究中心 www.dotcpp.com");
-	status=R;
-	while(1) {
-		Pos(64,10);
-		printf("得分：%d ",score);
-		Pos(64,11);
-		printf("每个食物得分：%d分",add);
-		if(GetAsyncKeyState(VK_UP) && status!=D) {
-			status=U;
-		} else if(GetAsyncKeyState(VK_DOWN) && status!=U) {
-			status=D;
-		} else if(GetAsyncKeyState(VK_LEFT)&& status!=R) {
-			status=L;
-		} else if(GetAsyncKeyState(VK_RIGHT)&& status!=L) {
-			status=R;
-		} else if(GetAsyncKeyState(VK_SPACE)) {
-			pause();
-		} else if(GetAsyncKeyState(VK_ESCAPE)) {
-			endgamestatus=3;
-			break;
-		} else if(GetAsyncKeyState(VK_F1)) {
-			if(sleeptime>=50) {
-				sleeptime=sleeptime-30;
-				add=add+2;
-				if(sleeptime==320) {
-					add=2;//防止减到1之后再加回来有错
-				}
-			}
-		} else if(GetAsyncKeyState(VK_F2)) {
-			if(sleeptime<350) {
-				sleeptime=sleeptime+30;
-				add=add-2;
-				if(sleeptime==350) {
-					add=1; //保证最低分为1
-				}
-			}
-		}
-		Sleep(sleeptime);
-		snakemove();
-	}
-}
-
-void welcometogame()//开始界面
-{
-	Pos(40,12);
-
-	system("title c语言研究中心 www.dotcpp.com");
-	printf("欢迎来到贪食蛇游戏！");
-	Pos(40,25);
-	system("pause");
-	system("cls");
-	Pos(25,12);
-	printf("用↑.↓.←.→分别控制蛇的移动， F1 为加速，2 为减速\n");
-	Pos(25,13);
-	printf("加速将能得到更高的分数。\n");
-	system("pause");
-	system("cls");
-}
-
-void endgame()//结束游戏
-{
-
-	system("cls");
-	Pos(24,12);
-	if(endgamestatus==1) {
-		printf("对不起，您撞到墙了。游戏结束.");
-	} else if(endgamestatus==2) {
-		printf("对不起，您咬到自己了。游戏结束.");
-	} else if(endgamestatus==3) {
-		printf("您的已经结束了游戏。");
-	}
-	Pos(24,13);
-	printf("您的得分是%d\n",score);
-	exit(0);
-}
-
-void gamestart()//游戏初始化
-{
-	system("mode con cols=100 lines=30");
-	welcometogame();
-	creatMap();
-	initsnake();
-	createfood();
-}
-
-int main()
-{
-	gamestart();
-	gamecircle();
-	endgame();
-	return 0;
-}
